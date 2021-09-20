@@ -522,7 +522,7 @@
         -->
         <drilldown target="_blank">
           <condition field="container_id">
-            <link>https://bicssplunk.bc:8000/en-GB/app/dashboard_messaging/docker_container_details?form.container_id=$row.container_id$</link>
+            <link>docker_container_details?form.container_id=$row.container_id$</link>
           </condition>
           <condition></condition>
         </drilldown>
