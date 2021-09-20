@@ -10,6 +10,7 @@ if __name__ == '__main__':
     since = '1m'
 
     ps_output = call_subprocess('docker ps -a --format "{{.ID}}"')
+    ps_output = str(ps_output, "utf-8")
 
     #print("ps_output=%s" % ps_output)
 
@@ -18,6 +19,7 @@ if __name__ == '__main__':
 
     for container_id in ps_parsed:
         logs_output = call_subprocess('docker logs --since '+since+' '+container_id)
+        logs_output = str(logs_output, "utf-8")
         #print("logs_output=%s" % logs_output)
         
         ts = "{:.9f}".format(time.time())

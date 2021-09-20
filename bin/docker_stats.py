@@ -15,8 +15,10 @@ if __name__ == '__main__':
     ts = int(time.time())
     #print("ts=%s" % ts)
     stats_output = call_subprocess('docker stats --no-stream=true --format "{{.ID}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}"')
+    stats_output = str(stats_output, "utf-8")
 
     ps_output = call_subprocess('docker ps -a --format "{{.ID}}\t{{.Image}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}"')
+    ps_output = str(ps_output, "utf-8")
     #ps_output = call_subprocess('docker ps -a')
 
     #print("ps_output=%s" % ps_output)

@@ -9,6 +9,7 @@ if __name__ == '__main__':
     ts = int(time.time())
 
     ps_output = call_subprocess('docker ps -a --format "{{.ID}}"')
+    ps_output = str(ps_output, "utf-8")
 
     #print("ps_output=%s" % ps_output)
 
@@ -17,6 +18,7 @@ if __name__ == '__main__':
 
     for container_id in ps_parsed:
         top_output = call_subprocess('docker exec -i '+container_id+' top -b -n1 -w512')
+        top_output = str(top_output, "utf-8")
 
         top_parsed = re.findall(r"(?P<pid>\d+)\s+(?P<user>\S+)\s+(?P<priority>\d+)\s+(?P<nice>\d+)\s+(?P<mem_virt_val>[\d\.]+)(?P<mem_virt_unit>\S*)\s+(?P<mem_res_val>[\d\.]+)(?P<mem_res_unit>\S*)\s+(?P<mem_shr_val>[\d\.]+)(?P<mem_shr_unit>\S*)\s+(?P<status>\S+)\s+(?P<cpu_perc>[\d\.]+)\s+(?P<mem_perc>[\d\.]+)\s+(?P<time>[\d\.:]+)\s+(?P<command>\S+)", top_output)
         #print("top_parsed=%s" % top_parsed)
