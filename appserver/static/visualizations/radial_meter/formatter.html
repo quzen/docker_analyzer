@@ -1,0 +1,48 @@
+<form class="splunk-formatter-section" section-label="General">
+    <splunk-control-group label="Caption">
+        <splunk-text-input name="{{VIZ_NAMESPACE}}.caption"></splunk-text-input>
+    </splunk-control-group>
+    <splunk-control-group label="Background">
+        <splunk-color-picker name="{{VIZ_NAMESPACE}}.backgroundColor" value="#FFF"></splunk-color-picker> 
+    </splunk-control-group>
+    <splunk-control-group label="Dial color">
+        <splunk-color-picker name="{{VIZ_NAMESPACE}}.dialColor" value="#d0d5d9"></splunk-color-picker> 
+    </splunk-control-group>
+    <splunk-control-group label="Static value color" help="applies if color is static">
+        <splunk-color-picker name="{{VIZ_NAMESPACE}}.valueColor" value="#555"></splunk-color-picker> 
+    </splunk-control-group>
+    <splunk-control-group label="Min value">
+        <splunk-text-input name="{{VIZ_NAMESPACE}}.minValue" value="0"></splunk-text-input>
+    </splunk-control-group>
+    <splunk-control-group label="Max value">
+        <splunk-text-input name="{{VIZ_NAMESPACE}}.maxValue" value="100"></splunk-text-input>
+    </splunk-control-group>
+</form>
+<form class="splunk-formatter-section" section-label="Ranges">
+    <splunk-control-group label="Color">
+        <splunk-radio-input name="{{VIZ_NAMESPACE}}.useRangemap" value="false">
+            <option value="false">Static</option>
+            <option value="true">Ranges</option>
+        </splunk-radio-input> 
+    </splunk-control-group>
+    <splunk-control-group label="Range style">  
+        <splunk-radio-input name="{{VIZ_NAMESPACE}}.thresholdStyle" value="percentage">
+            <option value="percentage">Percentage</option>
+            <option value="realValue">Value</option>
+        </splunk-radio-input> 
+    </splunk-control-group>
+    <splunk-control-group label="Low">
+        <splunk-color-picker name="{{VIZ_NAMESPACE}}.minRangeColor" value="#3fc77a" style="vertical-align:top; display:inline-block;"></splunk-color-picker> 
+        <span style="display:inline-block; margin:5px;">starts at min value</span>
+    </splunk-control-group>
+    <splunk-control-group label="Mid">
+        <splunk-color-picker name="{{VIZ_NAMESPACE}}.midRangeColor" value="#fbcd2f" style="vertical-align:top; display:inline-block;"></splunk-color-picker> 
+        <span style="display:inline-block; margin:5px;">starts at</span>
+        <splunk-text-input name="{{VIZ_NAMESPACE}}.midRangeThreshold" value="55" style="vertical-align:top; width: 50px; display:inline-block;"></splunk-text-input>
+    </splunk-control-group>
+    <splunk-control-group label="High">
+        <splunk-color-picker name="{{VIZ_NAMESPACE}}.maxRangeColor" value="#b44441" style="vertical-align:top; display:inline-block;"></splunk-color-picker> 
+        <span style="display:inline-block; margin:5px;">starts at</span>
+        <splunk-text-input name="{{VIZ_NAMESPACE}}.maxRangeThreshold" value="80" style="vertical-align:top; width: 50px; display:inline-block;"></splunk-text-input>
+    </splunk-control-group>
+</form>

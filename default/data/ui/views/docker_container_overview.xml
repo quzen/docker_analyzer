@@ -1,0 +1,561 @@
+<form script="multiselect_functions.js">
+  <label>Docker Overview</label>
+  <description>System performance metrics</description>
+  <init>
+    <!-- set or unset Debug token which activates Debug Panel -->
+    <unset token="debug_tok">debug</unset>
+  </init>
+  <!-- CSS row  -->
+  <row depends="$alwaysHideCSS$">
+    <panel depends="$alwaysHideCSS$">
+      <html>
+        <style>
+          /* Panel Title Style */
+          .dashboard-row .dashboard-panel h2.panel-title {
+            color: #157EFB;
+            font-size: 20px;
+            font-weight: 500;
+            background-color: #c7d2de;
+            padding: 5px 5px 5px 5px;
+          }
+          /* Buttons */
+          button[label="Configuration and Uptime"] {
+            font-size: 14px;
+            text-decoration: none;
+            text-rendering: optimizeLegibility;
+            color: white !important;
+            font-weight: bold;
+            display: inline-block;
+            padding: 0.4em 1em;
+            border: 0.1em solid #9599a3;
+            border-radius: 0.38em;
+            background-image: linear-gradient(#c4c4c4, #9599a3);
+          }
+          /* Buttons active */
+          button[label="Hide Configuration and Uptime"] {
+            font-size: 14px;
+            text-decoration: none;
+            text-rendering: optimizeLegibility;
+            color: white !important;
+            font-weight: bold;
+            display: inline-block;
+            padding: 0.4em 1em;
+            border: 0.1em solid #048cc7;
+            border-radius: 0.38em;
+            background-image: linear-gradient(#5da8c9, #1e93c6);
+          }
+        </style>
+       </html>
+    </panel>
+  </row>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="time_tok" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+      <change>
+        <condition>
+         <!-- set time span depending on the selected time range -->
+         <eval token="time_diff">relative_time(now(),'latest') - relative_time(now(),'earliest')</eval>
+         <eval token="form.timespan_tok">case(('time_diff' &lt; 172800), "5m", ('time_diff' &lt; 432000), "15min", ('time_diff' &gt; 432000), "")</eval>
+        </condition>
+      </change>
+    </input>
+    <input type="dropdown" token="timespan_tok">
+      <label>Timespan</label>
+      <choice value="">adaptive</choice>
+      <choice value="1m">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <choice value="1d">1d</choice>
+      <prefix>span="</prefix>
+      <suffix>"</suffix>
+      <default></default>
+    </input>
+    <input type="dropdown" token="autorefresh_tok">
+      <label>Autorefresh</label>
+      <choice value="0">off</choice>
+      <choice value="60">1m</choice>
+      <choice value="300">5m</choice>
+      <choice value="900">15m</choice>
+      <choice value="3600">1h</choice>
+      <choice value="86400">1d</choice>
+      <default>0</default>
+    </input>
+    <input id="host" type="multiselect" token="host" searchWhenChanged="true">
+      <label>Host:</label>
+      <search>
+        <query>
+        | tstats count where index=docker sourcetype=docker:stats ($labels$ $names$) by host
+        </query>
+        <earliest>$time_tok.earliest$</earliest>
+        <latest>$time_tok.latest$</latest>
+      </search>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <prefix>(</prefix>
+      <valuePrefix>host="</valuePrefix>
+      <delimiter>  OR </delimiter>
+      <valueSuffix>"</valueSuffix>
+      <suffix>)</suffix>
+      <default>*</default>
+    </input>
+    <input id="labels" type="multiselect" token="labels" searchWhenChanged="true">
+      <label>Label:</label>
+      <search>
+        <query>
+        | tstats count where index=docker sourcetype=docker:stats ($host$ $names$) by labels
+        | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
+        | stats count by labels
+        </query>
+        <earliest>$time_tok.earliest$</earliest>
+        <latest>$time_tok.latest$</latest>
+      </search>
+      <fieldForLabel>labels</fieldForLabel>
+      <fieldForValue>labels</fieldForValue>
+      <prefix>(</prefix>
+      <valuePrefix>labels="</valuePrefix>
+      <delimiter>  OR </delimiter>
+      <valueSuffix>"</valueSuffix>
+      <suffix>)</suffix>
+      <default>*</default>
+    </input>
+    <input id="names" type="multiselect" token="names" searchWhenChanged="true">
+      <label>Name:</label>
+      <search>
+        <query>
+        | tstats count where index=docker sourcetype=docker:stats ($host$ $labels$) by names
+        </query>
+        <earliest>$time_tok.earliest$</earliest>
+        <latest>$time_tok.latest$</latest>
+      </search>
+      <fieldForLabel>names</fieldForLabel>
+      <fieldForValue>names</fieldForValue>
+      <prefix>(</prefix>
+      <valuePrefix>names="</valuePrefix>
+      <delimiter>  OR </delimiter>
+      <valueSuffix>"</valueSuffix>
+      <suffix>)</suffix>
+      <default>*</default>
+    </input>
+  </fieldset>
+
+
+
+  <row>
+    <panel>
+      <chart>
+        <title>Containers by latest Status</title>
+        <search>
+          <refresh>$autorefresh_tok$</refresh>
+          <query>
+          | tstats latest(status_short) as status_short where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by container_id
+          | stats count by status_short
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="height">100</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">Status</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.fieldColors">{"Up": 0x53a051, "Exited": 0xdc4e41}</option>
+      </chart>
+    </panel>
+    <panel>
+      <single>
+        <title>Highest CPU usage</title>
+        <search>
+          <query>
+          | tstats avg(cpu_perc) as cpu_perc where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by host, labels, names, container_id
+          | sort -cpu_perc
+          | head 1
+          | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
+          | eval highest_cpu_container=host+":"+labels+":"+names
+          | table cpu_perc, highest_cpu_container
+          </query>
+          <done>
+            <set token="highest_cpu">$result.highest_cpu_container$</set>
+          </done>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[30,50,70]</option>
+        <option name="underLabel">$highest_cpu$</option>
+        <option name="unit">%</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">0</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Highest Memory usage</title>
+        <search>
+          <query>
+          | tstats avg(mem_usage_bytes) as mem_usage_bytes where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by host, labels, names, container_id
+          | eval mem_usage=round(mem_usage_bytes/1024/1024, 0)
+          | sort -mem_usage
+          | head 1
+          | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
+          | eval highest_memory_container=host+":"+labels+":"+names
+          | table mem_usage, highest_memory_container
+          </query>
+          <done>
+            <set token="highest_memory">$result.highest_memory_container$</set>
+          </done>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[1000,5000,10000]</option>
+        <option name="underLabel">$highest_memory$</option>
+        <option name="unit">MB</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">0</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <!-- Switcher for BY grouping -->
+      <input type="dropdown" searchWhenChanged="true" token="group_tok">
+        <label>Group by</label>
+        <choice value="host">Host</choice>
+        <choice value="labels">Label</choice>
+        <choice value="names">Name</choice>
+        <default>labels</default>
+      </input>
+   </panel>
+  </row>
+  <row>
+    <panel>
+      <title>CPU Usage Statistics</title>
+      <chart>
+        <title>100% = 1 core</title>
+        <search>
+          <query>
+          | tstats avg(cpu_perc) as avg_cpu_perc where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by $group_tok$, container_id, _time $timespan_tok$
+          | timechart $timespan_tok$ sum(avg_cpu_perc) as avg_cpu_perc by $group_tok$
+          | rename max_cpu_perc as "Max CPU usage", avg_cpu_perc as "Avg CPU usage"
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">CPU % usage</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">350</option>
+        <option name="refresh.display">none</option>
+      </chart>
+    </panel>
+  <!--
+  </row>
+  <row>
+  -->
+    <panel>
+      <title>Memory Usage Statistics</title>
+      <chart>
+        <title>Used memory</title>
+        <search>
+          <query>
+          | tstats avg(mem_usage_bytes) as mem_usage_bytes where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by $group_tok$, container_id, _time $timespan_tok$
+          | eval mem_usage=round(mem_usage_bytes/1024/1024, 0)
+          | timechart $timespan_tok$ sum(mem_usage) as mem_usage by $group_tok$
+          | rename mem_usage as "mem_usage_MB"
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">350</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">volume (MB)</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.overlayFields">mem_limit_MB</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.fieldColors">{"mem_limit_MB": #e50000, "mem_free_MB": #bbc5cf, "mem_usage_MB": #f1b288}</option>
+        <option name="refresh.display">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>PID count</title>
+      <chart>
+        <title>Number of running processes</title>
+        <search>
+          <query>
+          | tstats avg(pid_count) as pid_count where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by $group_tok$, container_id, _time $timespan_tok$
+          | timechart $timespan_tok$ sum(pid_count) as pid_count by $group_tok$
+          | rename pid_count as "PID count"
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">PID count</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.text">Status, %</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.maximumNumber">100</option>
+        <option name="charting.axisY2.minimumNumber">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">Status</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.fieldColors">{"Status": #e50000}</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">350</option>
+        <option name="refresh.display">none</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Containers: $eventCount$</title>
+        <search>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+          <query>
+            | tstats latest(host) as host, latest(labels) as labels, latest(names) as names, latest(image) as image, latest(created_at) as created_at, latest(status_short) as status_short, latest(status_since) as status_since, avg(cpu_perc) as cpu_perc, avg(mem_perc) as mem_perc, avg(pid_count) as pid_count, perc50(cpu_perc) as avg_cpu_perc, max(cpu_perc) as max_cpu_perc, avg(mem_usage_bytes) as avg_mem_usage_bytes, max(mem_usage_bytes) as max_mem_usage_bytes where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by container_id, _time $timespan_tok$
+            | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
+            | chart sparkline(avg(cpu_perc)) as cpu_perc, sparkline(avg(mem_perc)) as mem_perc, sparkline(avg(pid_count)) as pid_count, avg(avg_cpu_perc) as avg_cpu_perc, max(max_cpu_perc) as max_cpu_perc, avg(avg_mem_usage_bytes) as avg_mem_usage_bytes, max(max_mem_usage_bytes) as max_mem_usage_bytes, latest(host) as host, latest(labels) as labels, latest(names) as names, latest(image) as image, latest(created_at) as created_at, latest(status_short) as status_short, latest(status_since) as status_since by container_id
+            | eval avg_mem_usage=avg_mem_usage_bytes/1024/1024, max_mem_usage=max_mem_usage_bytes/1024/1024
+            | table container_id, host, labels, names, image, created_at, status_short, status_since, avg_cpu_perc, max_cpu_perc, cpu_perc, avg_mem_usage, max_mem_usage, mem_perc, pid_count
+            | sort host, labels, names
+          </query>
+          <done>
+            <set token="eventCount">$job.resultCount$</set>
+          </done>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="wrap">true</option>
+        <format type="color" field="status_short">
+          <colorPalette type="expression">if(value=="Up", "#65A637", "#D93F3C")</colorPalette>
+        </format>
+        <format type="color" field="avg_cpu_perc">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">30,50,70</scale>
+        </format>
+        <format type="color" field="max_cpu_perc">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">30,50,70</scale>
+        </format>
+        <format type="color" field="avg_mem_usage">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">1000,5000,10000</scale>
+        </format>
+        <format type="color" field="max_mem_usage">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">1000,5000,10000</scale>
+        </format>
+        <format type="color" field="host">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="labels">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="number" field="avg_cpu_perc">
+          <option name="precision">0</option>
+          <option name="unit">%</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="number" field="max_cpu_perc">
+          <option name="precision">0</option>
+          <option name="unit">%</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="number" field="avg_mem_usage">
+          <option name="precision">0</option>
+          <option name="unit">MB</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="number" field="max_mem_usage">
+          <option name="precision">0</option>
+          <option name="unit">MB</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="sparkline" field="cpu_perc">
+          <option name="lineColor">#5379af</option>
+          <option name="fillColor">#CCDDFF</option>
+          <option name="lineWidth">1</option>
+          <option name="height">25</option>
+          <option name="chartRangeMax">100</option>
+          <option name="chartRangeMin">0</option>
+        </format>
+        <format type="sparkline" field="mem_perc">
+          <option name="lineColor">#5379af</option>
+          <option name="fillColor">#CCDDFF</option>
+          <option name="lineWidth">1</option>
+          <option name="height">25</option>
+          <option name="chartRangeMax">100</option>
+          <option name="chartRangeMin">0</option>
+        </format>
+        <format type="sparkline" field="pid_count">
+          <option name="lineWidth">1</option>
+          <option name="height">25</option>
+          <option name="chartRangeMin">0</option>
+        </format>
+        <!--
+        <format field="availability_sparkline" type="sparkline">
+          <option name="type">line</option>
+          <option name="height">30px</option>
+          <option name="fillColor">#9ac23c</option>
+          <option name="chartRangeMax">100</option>
+          <option name="chartRangeMin">0</option>
+          
+          <option name="lineColor">#9ac23c</option>
+          <option name="normalRangeMin">50</option>
+          <option name="normalRangeMax">100</option>
+          <option name="valueSpots">
+            <option name="50:">#9ac23c</option>
+            <option name=":50">#dc4e41</option>
+          </option>
+        </format>
+        <format field="cpu_perc" type="sparkline">
+          <option name="type">bar</option>
+          <option name="height">30px</option>
+          <option name="barWidth">2px</option>
+          <option name="colorMap">
+            <option name="100000:">green</option>
+            <option name=":100000">blue</option>
+          </option>
+        </format>
+        <format field="mem_perc" type="sparkline">
+          <option name="type">bar</option>
+          <option name="height">30px</option>
+          <option name="barWidth">2px</option>
+          <option name="colorMap">
+            <option name="100000:">green</option>
+            <option name=":100000">blue</option>
+          </option>
+        </format>
+        -->
+        <drilldown target="_blank">
+          <condition field="container_id">
+            <link>https://bicssplunk.bc:8000/en-GB/app/dashboard_messaging/docker_container_details?form.container_id=$row.container_id$</link>
+          </condition>
+          <condition></condition>
+        </drilldown>
+      </table>
+   </panel>
+  </row>
+  
+  
+    <!-- Debug Panel -->
+  <row>
+    <panel depends="$debug_tok$">
+      <html>
+          <h3>Debug Panel</h3>        
+          <table border="0" cellpadding="12" cellspacing="0">
+            <tr>
+              <td>
+                <p>Token Values:</p>
+                <code>time_diff: $time_diff$</code>
+                <br/>
+                <code>show_configuration_uptime: $show_configuration_uptime$</code>
+                <br/>
+                
+                
+                
+                
+
+                
+                
+
+              </td>
+            </tr>
+          </table>
+        </html>
+    </panel>
+  </row>
+</form>

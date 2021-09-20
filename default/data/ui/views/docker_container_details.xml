@@ -1,0 +1,731 @@
+<form script="multiselect_functions.js">
+  <label>Docker Container</label>
+  <description>System performance metrics, configuration inventory</description>
+  <init>
+    <!-- set or unset Debug token which activates Debug Panel -->
+    <unset token="debug_tok">debug</unset>
+  </init>
+  <!-- CSS row  -->
+  <row depends="$alwaysHideCSS$">
+    <panel depends="$alwaysHideCSS$">
+      <html>
+        <style>
+          /* Panel Title Style */
+          .dashboard-row .dashboard-panel h2.panel-title {
+            color: #157EFB;
+            font-size: 20px;
+            font-weight: 500;
+            background-color: #c7d2de;
+            padding: 5px 5px 5px 5px;
+          }
+          /* Buttons */
+          button[label="Configuration and Uptime"], button[label="Full Config"], button[label="Events"], button[label="Logs"] {
+            font-size: 14px;
+            text-decoration: none;
+            text-rendering: optimizeLegibility;
+            color: white !important;
+            font-weight: bold;
+            display: inline-block;
+            padding: 0.4em 1em;
+            border: 0.1em solid #9599a3;
+            border-radius: 0.38em;
+            background-image: linear-gradient(#c4c4c4, #9599a3);
+          }
+          /* Buttons active */
+          button[label="Hide Configuration and Uptime"], button[label="Hide Full Config"], button[label="Hide Events"], button[label="Hide Logs"] {
+            font-size: 14px;
+            text-decoration: none;
+            text-rendering: optimizeLegibility;
+            color: white !important;
+            font-weight: bold;
+            display: inline-block;
+            padding: 0.4em 1em;
+            border: 0.1em solid #048cc7;
+            border-radius: 0.38em;
+            background-image: linear-gradient(#157efb, #157efb);
+          }
+        </style>
+       </html>
+    </panel>
+  </row>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="time_tok" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+      <change>
+        <condition>
+         <!-- set time span depending on the selected time range -->
+         <eval token="time_diff">relative_time(now(),'latest') - relative_time(now(),'earliest')</eval>
+         <eval token="form.timespan_tok">case(('time_diff' &lt; 172800), "5m", ('time_diff' &lt; 432000), "15min", ('time_diff' &gt; 432000), "")</eval>
+        </condition>
+      </change>
+    </input>
+    <input type="dropdown" token="timespan_tok">
+      <label>Timespan</label>
+      <choice value="">adaptive</choice>
+      <choice value="1m">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <choice value="1d">1d</choice>
+      <prefix>span="</prefix>
+      <suffix>"</suffix>
+      <default></default>
+    </input>
+    <input type="dropdown" token="autorefresh_tok">
+      <label>Autorefresh</label>
+      <choice value="0">off</choice>
+      <choice value="60">1m</choice>
+      <choice value="300">5m</choice>
+      <choice value="900">15m</choice>
+      <choice value="3600">1h</choice>
+      <choice value="86400">1d</choice>
+      <default>0</default>
+    </input>
+    <input id="host" type="dropdown" token="host" searchWhenChanged="true">
+      <label>Host:</label>
+      <search>
+        <query>
+        | tstats count where index=docker sourcetype=docker:stats by host
+        </query>
+        <earliest>$time_tok.earliest$</earliest>
+        <latest>$time_tok.latest$</latest>
+      </search>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <prefix>host="</prefix>
+      <suffix>"</suffix>
+      <default></default>
+    </input>
+    <input id="container_id" type="dropdown" token="container_id" searchWhenChanged="true">
+      <label>Container:</label>
+      <search>
+        <query>
+        | tstats latest(host) as host, latest(names) as names, latest(labels) as labels where index=docker sourcetype=docker:stats $host$ by container_id
+        | eval labels=if(len(labels) &gt; 32, "", labels)
+        | eval desc=if(labels=="", names+" - "+host+" ("+container_id+")", labels+" - "+host+" - "+names+" ("+container_id+")")
+        | sort desc
+        </query>
+        <earliest>$time_tok.earliest$</earliest>
+        <latest>$time_tok.latest$</latest>
+      </search>
+      <fieldForLabel>desc</fieldForLabel>
+      <fieldForValue>container_id</fieldForValue>
+      <prefix>container_id="</prefix>
+      <suffix>"</suffix>
+    </input>
+  </fieldset>
+  <!-- Base searches -->
+  <search id="base_cpu_usage">
+    <query>
+    | tstats max(cpu_perc) as max_cpu_perc, avg(cpu_perc) as avg_cpu_perc, median(cpu_perc) as median_cpu_perc where index=docker sourcetype=docker:stats $container_id$
+    | eval max_cpu_perc=round(max_cpu_perc, 0), avg_cpu_perc=round(avg_cpu_perc, 0), median_cpu_perc=round(median_cpu_perc, 0)
+    </query>
+    <earliest>$time_tok.earliest$</earliest>
+    <latest>$time_tok.latest$</latest>
+    <refresh>$autorefresh_tok$</refresh>
+    <refreshType>delay</refreshType>
+  </search>
+  
+  <search id="base_inventory">
+    <query>
+    index=docker sourcetype="docker:inventory" Id=$form.container_id$*
+    | head 1
+    | eval container_info='Config.Labels.omn_tc_img_name'+", "+'Config.Labels.omn_tc_img_version'+", "+'Config.Labels.omn_tc_build_time'+" ("+'Config.Labels.org.label-schema.name'+")"
+    | eval swap_info='HostConfig.MemorySwap'
+    | eval swap_info = mvindex(swap_info, 0)
+    | eval swap_info=swap_info/1024/1024
+    | eval memory_info='HostConfig.Memory'
+    | eval memory_info = mvindex(memory_info, 0)
+    | eval memory_info=memory_info/1024/1024
+    | eval full_config=_raw
+    </query>
+    <done>
+      <set token="full_config">$result.full_config$</set>
+    </done>
+    <earliest>$time_tok.earliest$</earliest>
+    <latest>$time_tok.latest$</latest>
+    <refresh>$autorefresh_tok$</refresh>
+    <refreshType>delay</refreshType>
+  </search>
+  
+  <row>
+    <panel>
+      <viz type="docker_analyzer.radial_meter">
+        <search base="base_cpu_usage">
+          <query>
+          | gauge max_cpu_perc
+          </query>
+        </search>
+        <option name="docker_analyzer.radial_meter.backgroundColor">#FFF</option>
+        <option name="docker_analyzer.radial_meter.dialColor">#d0d5d9</option>
+        <option name="docker_analyzer.radial_meter.valueColor">#555</option>
+        <option name="docker_analyzer.radial_meter.minValue">0</option>
+        <option name="docker_analyzer.radial_meter.maxValue">100</option>
+        <option name="docker_analyzer.radial_meter.useRangemap">true</option>
+        <option name="docker_analyzer.radial_meter.thresholdStyle">percentage</option>
+        <option name="docker_analyzer.radial_meter.minRangeColor">#3fc77a</option>
+        <option name="docker_analyzer.radial_meter.midRangeColor">#fbcd2f</option>
+        <option name="docker_analyzer.radial_meter.midRangeThreshold">55</option>
+        <option name="docker_analyzer.radial_meter.maxRangeColor">#b44441</option>
+        <option name="docker_analyzer.radial_meter.maxRangeThreshold">85</option>
+        <option name="docker_analyzer.radial_meter.caption">Max %CPU</option>
+        <option name="height">180</option>
+        <option name="refresh.display">preview</option>
+      </viz>
+    </panel>
+    <panel>
+      <viz type="docker_analyzer.radial_meter">
+        <search base="base_cpu_usage">
+          <query>
+          | gauge avg_cpu_perc
+          </query>
+        </search>
+        <option name="docker_analyzer.radial_meter.backgroundColor">#FFF</option>
+        <option name="docker_analyzer.radial_meter.dialColor">#d0d5d9</option>
+        <option name="docker_analyzer.radial_meter.valueColor">#555</option>
+        <option name="docker_analyzer.radial_meter.minValue">0</option>
+        <option name="docker_analyzer.radial_meter.maxValue">100</option>
+        <option name="docker_analyzer.radial_meter.useRangemap">true</option>
+        <option name="docker_analyzer.radial_meter.thresholdStyle">percentage</option>
+        <option name="docker_analyzer.radial_meter.minRangeColor">#3fc77a</option>
+        <option name="docker_analyzer.radial_meter.midRangeColor">#fbcd2f</option>
+        <option name="docker_analyzer.radial_meter.midRangeThreshold">55</option>
+        <option name="docker_analyzer.radial_meter.maxRangeColor">#b44441</option>
+        <option name="docker_analyzer.radial_meter.maxRangeThreshold">85</option>
+        <option name="docker_analyzer.radial_meter.caption">Avg %CPU</option>
+        <option name="height">180</option>
+        <option name="refresh.display">preview</option>
+      </viz>
+    </panel>
+    <panel>
+      <viz type="docker_analyzer.radial_meter">
+        <search>
+          <query>
+          | tstats max(mem_usage_bytes) as mem_usage_bytes, max(mem_limit_bytes) as mem_limit_bytes where index=docker sourcetype=docker:stats $container_id$
+          | eval mem_usage=round(mem_usage_bytes/1024/1024, 0), mem_limit=round(mem_limit_bytes/1024/1024, 0)
+          | eval mem_perc=round(100*mem_usage/mem_limit, 0)
+          | table mem_perc
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="docker_analyzer.radial_meter.backgroundColor">#FFF</option>
+        <option name="docker_analyzer.radial_meter.dialColor">#d0d5d9</option>
+        <option name="docker_analyzer.radial_meter.valueColor">#555</option>
+        <option name="docker_analyzer.radial_meter.minValue">0</option>
+        <option name="docker_analyzer.radial_meter.maxValue">100</option>
+        <option name="docker_analyzer.radial_meter.useRangemap">true</option>
+        <option name="docker_analyzer.radial_meter.thresholdStyle">percentage</option>
+        <option name="docker_analyzer.radial_meter.minRangeColor">#3fc77a</option>
+        <option name="docker_analyzer.radial_meter.midRangeColor">#fbcd2f</option>
+        <option name="docker_analyzer.radial_meter.midRangeThreshold">55</option>
+        <option name="docker_analyzer.radial_meter.maxRangeColor">#b44441</option>
+        <option name="docker_analyzer.radial_meter.maxRangeThreshold">85</option>
+        <option name="docker_analyzer.radial_meter.caption">Max %Mem</option>
+        <option name="height">180</option>
+        <option name="refresh.display">preview</option>
+      </viz>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <!-- Show Configuration and Uptime -->
+      <input type="link" token="configuration_uptime_tok" searchWhenChanged="true" rejects="$configuration_uptime_tok$">
+        <label></label>
+        <choice value="show">Configuration and Uptime</choice>
+        <change>
+          <condition value="show">
+            <set token="configuration_uptime_tok"></set>
+            <set token="show_configuration_uptime"></set>
+          </condition>
+        </change>
+      </input>
+      <input type="link" token="configuration_uptime_tok" searchWhenChanged="true" depends="$configuration_uptime_tok$">
+        <label></label>
+        <choice value="hide">Hide Configuration and Uptime</choice>
+        <change>
+          <condition value="hide">
+            <unset token="configuration_uptime_tok"></unset>
+            <unset token="show_configuration_uptime"></unset>
+          </condition>
+        </change>
+      </input>
+      <!-- Show Full Config -->
+      <input type="link" token="full_config_tok" searchWhenChanged="true" rejects="$full_config_tok$">
+        <label></label>
+        <choice value="show">Full Config</choice>
+        <change>
+          <condition value="show">
+            <set token="full_config_tok"></set>
+            <set token="show_full_config"></set>
+          </condition>
+        </change>
+      </input>
+      <input type="link" token="full_config_tok" searchWhenChanged="true" depends="$full_config_tok$">
+        <label></label>
+        <choice value="hide">Hide Full Config</choice>
+        <change>
+          <condition value="hide">
+            <unset token="full_config_tok"></unset>
+            <unset token="show_full_config"></unset>
+          </condition>
+        </change>
+      </input>
+      <!-- Show Events -->
+      <input type="link" token="events_tok" searchWhenChanged="true" rejects="$events_tok$">
+        <label></label>
+        <choice value="show">Events</choice>
+        <change>
+          <condition value="show">
+            <set token="events_tok"></set>
+            <set token="show_events"></set>
+          </condition>
+        </change>
+      </input>
+      <input type="link" token="events_tok" searchWhenChanged="true" depends="$events_tok$">
+        <label></label>
+        <choice value="hide">Hide Events</choice>
+        <change>
+          <condition value="hide">
+            <unset token="events_tok"></unset>
+            <unset token="show_events"></unset>
+          </condition>
+        </change>
+      </input>
+      <!-- Show Logs -->
+      <input type="link" token="logs_tok" searchWhenChanged="true" rejects="$logs_tok$">
+        <label></label>
+        <choice value="show">Logs</choice>
+        <change>
+          <condition value="show">
+            <set token="logs_tok"></set>
+            <set token="show_logs"></set>
+          </condition>
+        </change>
+      </input>
+      <input type="link" token="logs_tok" searchWhenChanged="true" depends="$logs_tok$">
+        <label></label>
+        <choice value="hide">Hide Logs</choice>
+        <change>
+          <condition value="hide">
+            <unset token="logs_tok"></unset>
+            <unset token="show_logs"></unset>
+          </condition>
+        </change>
+      </input>
+    </panel>
+  </row>
+  <row depends="$show_configuration_uptime$">
+    <panel rejects="$show_null_config$">
+      <title>Container Info</title>
+      <single>
+        <search base="base_inventory">
+          <query>
+          
+          | table container_info
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="underLabel">Container build</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Memory Configuration</title>
+      <single>
+        <search base="base_inventory">
+          <query>
+          
+          | table memory_info
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="underLabel">Total Memory</option>
+        <option name="unit">MB</option>
+      </single>
+      <single>
+        <search base="base_inventory">
+          <query>
+          
+          | table swap_info
+          </query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="underLabel">Total Paging Space</option>
+        <option name="unit">MB</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Status</title>
+      <single>
+        <search>
+          <query>
+          | tstats latest(status_short) as status_short, latest(status_since) as status_since where index=docker sourcetype=docker:stats $container_id$
+          | eval status_info=status_short+", "+status_since
+          | table status_info
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="underLabel">Status, since</option>
+      </single>
+    </panel>
+  </row>
+  <row depends="$show_full_config$">
+    <panel rejects="$show_null_config$">
+      <html>
+        <pre>$full_config$</pre>
+      </html>
+    </panel>
+  </row>
+  <row depends="$show_events$">
+    <panel>
+      <title>Events</title>
+      <input type="text" token="search_events_tok" searchWhenChanged="true">
+        <label>Search Events</label>
+        <default></default>
+      </input>
+      <event>
+        <search>
+          <query>
+          index=docker sourcetype=docker:events $form.container_id$* $search_events_tok$
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="list.drilldown">none</option>
+      </event>
+    </panel>
+  </row>
+  <row depends="$show_logs$">
+    <panel>
+      <title>Logs</title>
+      <input type="text" token="search_logs_tok" searchWhenChanged="true">
+        <label>Search Logs</label>
+        <default></default>
+      </input>
+      <event>
+        <search>
+          <query>
+          index=docker sourcetype=docker:logs $container_id$ $search_logs_tok$
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="list.drilldown">none</option>
+      </event>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>CPU Usage Statistics</title>
+      <chart>
+        <search>
+          <query>
+          | tstats max(cpu_perc) as max_cpu_perc, avg(cpu_perc) as avg_cpu_perc, median(cpu_perc) as median_cpu_perc where index=docker sourcetype=docker:stats $container_id$ by _time $timespan_tok$
+          | timechart $timespan_tok$ max(max_cpu_perc) as max_cpu_perc, avg(avg_cpu_perc) as avg_cpu_perc
+          | rename max_cpu_perc as "Max CPU usage", avg_cpu_perc as "Avg CPU usage"
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">350</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">CPU % usage</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="refresh.display">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Inbound/Outbound network traffic</title>
+      <chart>
+        <search>
+          <query>
+          index=docker sourcetype=docker:stats $container_id$
+          | streamstats window=1 current=f global=f last(netio_sent_bytes) as netio_sent_bytes_prev last(netio_recv_bytes) as netio_recv_bytes_prev
+          | eval netio_sent_bytes    = max(0, netio_sent_bytes_prev - netio_sent_bytes) * -1
+          | eval netio_recv_bytes    = max(0, netio_recv_bytes_prev - netio_recv_bytes)
+          | eval netio_sent_bytes=if(netio_sent_bytes &lt;= -9999999999, 0, netio_sent_bytes)
+          | eval netio_recv_bytes=if(netio_recv_bytes &gt;= 9999999999, 0, netio_recv_bytes)
+          | eval netio_sent_bytes    = netio_sent_bytes/1024/1024
+          | eval netio_recv_bytes    = netio_recv_bytes/1024/1024
+          | timechart $timespan_tok$ sum(netio_recv_bytes) as netio_recv_bytes, sum(netio_sent_bytes) as netio_sent_bytes
+          | rename netio_recv_bytes as "Inbound", netio_sent_bytes as "Outbound"
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">MB</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">350</option>
+        <option name="charting.axisTitleX.text">Time</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Memory Usage Statistics</title>
+      <chart>
+        <search>
+          <query>
+          | tstats avg(mem_usage_bytes) as mem_usage_bytes, avg(mem_limit_bytes) as mem_limit_bytes where index=docker sourcetype=docker:stats $container_id$ by _time $timespan_tok$
+          | eval mem_usage=round(mem_usage_bytes/1024/1024, 0), mem_limit=round(mem_limit_bytes/1024/1024, 0)
+          | eval mem_free=mem_limit-mem_usage
+          | timechart $timespan_tok$ avg(mem_free) as mem_free, avg(mem_limit) as mem_limit, avg(mem_usage) as mem_usage
+          | rename mem_usage as "mem_usage_MB", mem_limit as "mem_limit_MB", mem_free as "mem_free_MB"
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">350</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">volume (MB)</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.overlayFields">mem_limit_MB</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.fieldColors">{"mem_limit_MB": #e50000, "mem_free_MB": #bbc5cf, "mem_usage_MB": #f1b288}</option>
+        <option name="refresh.display">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Status and PID count</title>
+      <chart>
+        <search>
+          <query>
+          | tstats avg(pid_count) as pid_count, latest(status_short) as status_short where index=docker sourcetype=docker:stats $container_id$ by _time $timespan_tok$
+          | eval status=if(status_short=="Up", 100, 0)
+          | timechart $timespan_tok$ avg(pid_count) as pid_count, avg(status) as status
+          | rename pid_count as "PID count", status as "Status"
+          </query>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">PID count</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisTitleY2.text">Status, %</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.maximumNumber">100</option>
+        <option name="charting.axisY2.minimumNumber">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">Status</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.fieldColors">{"Status": #e50000}</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">350</option>
+        <option name="refresh.display">none</option>
+      </chart>
+    </panel>
+  </row>
+  <row rejects="$hide_top_processes$">
+    <panel>
+      <title>Processes: $eventCount$</title>
+      <table>
+        <search>
+          <refresh>$autorefresh_tok$</refresh>
+          <refreshType>delay</refreshType>
+          <query>
+            | tstats avg(cpu_perc) as cpu_perc, avg(mem_res_bytes) as mem_usage_bytes, perc50(cpu_perc) as avg_cpu_perc, max(cpu_perc) as max_cpu_perc, perc50(mem_res_bytes) as avg_mem_usage_bytes, max(mem_res_bytes) as max_mem_usage_bytes where index=docker sourcetype=docker:top $container_id$ by command, _time $timespan_tok$
+            | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
+            | eval mem_usage=round(mem_usage_bytes/1024/1024, 0), avg_mem_usage=round(avg_mem_usage_bytes/1024/1024, 0), max_mem_usage=round(max_mem_usage_bytes/1024/1024, 0)
+            | chart sparkline(avg(cpu_perc)) as cpu_perc, sparkline(avg(mem_usage)) as mem_usage, avg(avg_cpu_perc) as avg_cpu_perc, max(max_cpu_perc) as max_cpu_perc, avg(avg_mem_usage) as avg_mem_usage, max(max_mem_usage) as max_mem_usage by command
+            | table command, avg_cpu_perc, max_cpu_perc, cpu_perc, avg_mem_usage, max_mem_usage, mem_usage
+            | sort -max_cpu_perc
+          </query>
+          <done>
+            <condition match="'job.resultCount' == 0">
+              <set token="hide_top_processes"></set>
+            </condition>
+            <condition>
+              <unset token="hide_top_processes"></unset>
+              <set token="eventCount">$job.resultCount$</set>
+            </condition>
+          </done>
+          <earliest>$time_tok.earliest$</earliest>
+          <latest>$time_tok.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="wrap">true</option>
+        <format type="color" field="avg_cpu_perc">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">30,50,70</scale>
+        </format>
+        <format type="color" field="max_cpu_perc">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">30,50,70</scale>
+        </format>
+        <format type="color" field="avg_mem_usage">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">1000,5000,10000</scale>
+        </format>
+        <format type="color" field="avg_mem_usage">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">1000,5000,10000</scale>
+        </format>
+        <format type="color" field="max_mem_usage">
+          <colorPalette type="list">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</colorPalette>
+          <scale type="threshold">1000,5000,10000</scale>
+        </format>
+        <format type="number" field="avg_cpu_perc">
+          <option name="precision">0</option>
+          <option name="unit">%</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="number" field="max_cpu_perc">
+          <option name="precision">0</option>
+          <option name="unit">%</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="number" field="avg_mem_usage">
+          <option name="precision">0</option>
+          <option name="unit">MB</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="number" field="max_mem_usage">
+          <option name="precision">0</option>
+          <option name="unit">MB</option>
+          <option name="useThousandSeparators">false</option>
+        </format>
+        <format type="sparkline" field="cpu_perc">
+          <option name="lineColor">#5379af</option>
+          <option name="fillColor">#CCDDFF</option>
+          <option name="lineWidth">1</option>
+          <option name="height">25</option>
+          <!--
+          <option name="chartRangeMax">100</option>
+          <option name="chartRangeMin">0</option>
+          -->
+        </format>
+        <format type="sparkline" field="mem_usage">
+          <option name="lineColor">#5379af</option>
+          <option name="fillColor">#CCDDFF</option>
+          <option name="lineWidth">1</option>
+          <option name="height">25</option>
+        </format>
+      </table>
+   </panel>
+  </row>
+  
+  
+    <!-- Debug Panel -->
+  <row>
+    <panel depends="$debug_tok$">
+      <html>
+          <h3>Debug Panel</h3>        
+          <table border="0" cellpadding="12" cellspacing="0">
+            <tr>
+              <td>
+                <p>Token Values:</p>
+                <code>time_diff: $time_diff$</code>
+                <br/>
+                <code>show_configuration_uptime: $show_configuration_uptime$</code>
+                <br/>
+                
+                
+                
+                
+
+                
+                
+
+              </td>
+            </tr>
+          </table>
+        </html>
+    </panel>
+  </row>
+</form>
