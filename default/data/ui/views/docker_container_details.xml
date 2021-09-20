@@ -134,7 +134,7 @@
     <query>
     index=docker sourcetype="docker:inventory" Id=$form.container_id$*
     | head 1
-    | eval container_info='Config.Labels.omn_tc_img_name'+", "+'Config.Labels.omn_tc_img_version'+", "+'Config.Labels.omn_tc_build_time'+" ("+'Config.Labels.org.label-schema.name'+")"
+    | eval container_info='Config.Image'+", "+'Created'
     | eval swap_info='HostConfig.MemorySwap'
     | eval swap_info = mvindex(swap_info, 0)
     | eval swap_info=swap_info/1024/1024
