@@ -6,7 +6,7 @@ from utils import call_subprocess
 
 if __name__ == '__main__':
     my_parser = argparse.ArgumentParser()
-    my_parser.add_argument('--label', action='store', type=str)
+    my_parser.add_argument('--since', action='store', type=str)
 
     args = my_parser.parse_args()
     if args.since:
