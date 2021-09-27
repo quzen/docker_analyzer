@@ -12,7 +12,7 @@
         <style>
           /* Panel Title Style */
           .dashboard-row .dashboard-panel h2.panel-title {
-            color: #157EFB;
+            color: #62b9fe;
             font-size: 20px;
             font-weight: 500;
             background-color: #c7d2de;
@@ -42,7 +42,7 @@
             padding: 0.4em 1em;
             border: 0.1em solid #048cc7;
             border-radius: 0.38em;
-            background-image: linear-gradient(#157efb, #157efb);
+            background-image: linear-gradient(#62b9fe, #62b9fe);
           }
         </style>
        </html>
@@ -105,8 +105,7 @@
       <search>
         <query>
         | tstats latest(host) as host, latest(names) as names, latest(labels) as labels where index=docker sourcetype=docker:stats $host$ by container_id
-        | eval labels=if(len(labels) &gt; 32, "", labels)
-        | eval desc=if(labels=="", names+" - "+host+" ("+container_id+")", labels+" - "+host+" - "+names+" ("+container_id+")")
+        | eval desc=if(labels=="NoLabel", names+" - "+host+" ("+container_id+")", names+" - "+host+" - "+labels+" ("+container_id+")")
         | sort desc
         </query>
         <earliest>$time_tok.earliest$</earliest>
@@ -685,10 +684,6 @@
           <option name="fillColor">#CCDDFF</option>
           <option name="lineWidth">1</option>
           <option name="height">25</option>
-          <!--
-          <option name="chartRangeMax">100</option>
-          <option name="chartRangeMin">0</option>
-          -->
         </format>
         <format type="sparkline" field="mem_usage">
           <option name="lineColor">#5379af</option>

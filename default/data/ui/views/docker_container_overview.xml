@@ -12,7 +12,7 @@
         <style>
           /* Panel Title Style */
           .dashboard-row .dashboard-panel h2.panel-title {
-            color: #157EFB;
+            color: #62b9fe;
             font-size: 20px;
             font-weight: 500;
             background-color: #c7d2de;
@@ -42,7 +42,7 @@
             padding: 0.4em 1em;
             border: 0.1em solid #048cc7;
             border-radius: 0.38em;
-            background-image: linear-gradient(#5da8c9, #1e93c6);
+            background-image: linear-gradient(#62b9fe, #62b9fe);
           }
         </style>
        </html>
@@ -108,7 +108,6 @@
       <search>
         <query>
         | tstats count where index=docker sourcetype=docker:stats ($host$ $names$) by labels
-        | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
         | stats count by labels
         </query>
         <earliest>$time_tok.earliest$</earliest>
@@ -194,8 +193,7 @@
           | tstats avg(cpu_perc) as cpu_perc where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by host, labels, names, container_id
           | sort -cpu_perc
           | head 1
-          | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
-          | eval highest_cpu_container=host+":"+labels+":"+names
+          | eval highest_cpu_container=host+":"+names+":"+labels
           | table cpu_perc, highest_cpu_container
           </query>
           <done>
@@ -224,8 +222,7 @@
           | eval mem_usage=round(mem_usage_bytes/1024/1024, 0)
           | sort -mem_usage
           | head 1
-          | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
-          | eval highest_memory_container=host+":"+labels+":"+names
+          | eval highest_memory_container=host+":"+names+":"+labels
           | table mem_usage, highest_memory_container
           </query>
           <done>
@@ -254,7 +251,7 @@
         <choice value="host">Host</choice>
         <choice value="labels">Label</choice>
         <choice value="names">Name</choice>
-        <default>labels</default>
+        <default>names</default>
       </input>
    </panel>
   </row>
@@ -294,10 +291,6 @@
         <option name="refresh.display">none</option>
       </chart>
     </panel>
-  <!--
-  </row>
-  <row>
-  -->
     <panel>
       <title>Memory Usage Statistics</title>
       <chart>
@@ -399,11 +392,10 @@
           <refreshType>delay</refreshType>
           <query>
             | tstats latest(host) as host, latest(labels) as labels, latest(names) as names, latest(image) as image, latest(created_at) as created_at, latest(status_short) as status_short, latest(status_since) as status_since, avg(cpu_perc) as cpu_perc, avg(mem_perc) as mem_perc, avg(pid_count) as pid_count, perc50(cpu_perc) as avg_cpu_perc, max(cpu_perc) as max_cpu_perc, avg(mem_usage_bytes) as avg_mem_usage_bytes, max(mem_usage_bytes) as max_mem_usage_bytes where index=docker sourcetype=docker:stats ($host$ $labels$ $names$) by container_id, _time $timespan_tok$
-            | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
             | chart sparkline(avg(cpu_perc)) as cpu_perc, sparkline(avg(mem_perc)) as mem_perc, sparkline(avg(pid_count)) as pid_count, avg(avg_cpu_perc) as avg_cpu_perc, max(max_cpu_perc) as max_cpu_perc, avg(avg_mem_usage_bytes) as avg_mem_usage_bytes, max(max_mem_usage_bytes) as max_mem_usage_bytes, latest(host) as host, latest(labels) as labels, latest(names) as names, latest(image) as image, latest(created_at) as created_at, latest(status_short) as status_short, latest(status_since) as status_since by container_id
             | eval avg_mem_usage=avg_mem_usage_bytes/1024/1024, max_mem_usage=max_mem_usage_bytes/1024/1024
-            | table container_id, host, labels, names, image, created_at, status_short, status_since, avg_cpu_perc, max_cpu_perc, cpu_perc, avg_mem_usage, max_mem_usage, mem_perc, pid_count
-            | sort host, labels, names
+            | table container_id, host, names, labels, image, created_at, status_short, status_since, avg_cpu_perc, max_cpu_perc, cpu_perc, avg_mem_usage, max_mem_usage, mem_perc, pid_count
+            | sort host, names, labels
           </query>
           <done>
             <set token="eventCount">$job.resultCount$</set>
@@ -485,41 +477,6 @@
           <option name="height">25</option>
           <option name="chartRangeMin">0</option>
         </format>
-        <!--
-        <format field="availability_sparkline" type="sparkline">
-          <option name="type">line</option>
-          <option name="height">30px</option>
-          <option name="fillColor">#9ac23c</option>
-          <option name="chartRangeMax">100</option>
-          <option name="chartRangeMin">0</option>
-          
-          <option name="lineColor">#9ac23c</option>
-          <option name="normalRangeMin">50</option>
-          <option name="normalRangeMax">100</option>
-          <option name="valueSpots">
-            <option name="50:">#9ac23c</option>
-            <option name=":50">#dc4e41</option>
-          </option>
-        </format>
-        <format field="cpu_perc" type="sparkline">
-          <option name="type">bar</option>
-          <option name="height">30px</option>
-          <option name="barWidth">2px</option>
-          <option name="colorMap">
-            <option name="100000:">green</option>
-            <option name=":100000">blue</option>
-          </option>
-        </format>
-        <format field="mem_perc" type="sparkline">
-          <option name="type">bar</option>
-          <option name="height">30px</option>
-          <option name="barWidth">2px</option>
-          <option name="colorMap">
-            <option name="100000:">green</option>
-            <option name=":100000">blue</option>
-          </option>
-        </format>
-        -->
         <drilldown target="_blank">
           <condition field="container_id">
             <link>docker_container_details?form.container_id=$row.container_id$</link>

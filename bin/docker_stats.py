@@ -13,21 +13,15 @@ if __name__ == '__main__':
     args = my_parser.parse_args()
     
     ts = int(time.time())
-    #print("ts=%s" % ts)
     stats_output = call_subprocess('docker stats --no-stream=true --format "{{.ID}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}"')
     stats_output = str(stats_output, "utf-8")
 
     ps_output = call_subprocess('docker ps -a --format "{{.ID}}\t{{.Image}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}"')
     ps_output = str(ps_output, "utf-8")
-    #ps_output = call_subprocess('docker ps -a')
-
-    #print("ps_output=%s" % ps_output)
 
     ps_parsed = re.findall(r"(?P<container_id>\S+)\t(?P<image>[^\t]+)\t(?P<names>[^\t]+)\t(?P<created_at>[^\t]+)\t(?P<status_short>\S+)\s+(?P<status_since>[^\t]+)\t(?P<labels>[^\n]+)", ps_output)
-    #print("ps_parsed=%s" % ps_parsed)
 
     stats_parsed = re.findall(r"(?P<container_id>\S+)\t(?P<cpu_perc>[\d\.]+)%\t(?P<mem_usage_val>[\d\.]+)(?P<mem_usage_unit>\S+) \/ (?P<mem_limit_val>[\d\.]+)(?P<mem_limit_unit>\S+)\t(?P<mem_perc>[\d\.]+)%\t(?P<netio_sent_val>[\d\.]+)(?P<netio_sent_unit>\S+) \/ (?P<netio_recv_val>[\d\.]+)(?P<netio_recv_unit>\S+)\t(?P<blockio_read_val>[\d\.]+)(?P<blockio_read_unit>\S+) \/ (?P<blockio_write_val>[\d\.]+)(?P<blockio_write_unit>\S+)\t(?P<pid_count>\d+)", stats_output)
-    #print("stats_parsed=%s" % stats_parsed)
 
     ps_data = dict()
     if ps_parsed:
@@ -39,19 +33,13 @@ if __name__ == '__main__':
             status_short = line[4]
             status_since = line[5]
             labels = line[6]
-            # if Openmind - get only 1 useful Label
-            #if 'omn_tc_cont_type=' in labels:
-            #    label_parsed = re.findall(r"omn_tc_cont_type=(?P<omn_tc_cont_type>[^,]+)", labels)
-            #    labels = label_parsed[0]
-            #else:
-            #    labels = labels[:32]
                 
             if args.label in labels:
                 label_re = r"" + args.label + "=(?P<label>[^,]+)"
                 label_parsed = re.findall(label_re, labels)
                 labels = label_parsed[0]
             else:
-                labels = labels[:32]
+                labels = "NoLabel"
             
             ps_data.setdefault(container_id, {})
             ps_data[container_id]['image'] = image
@@ -61,12 +49,7 @@ if __name__ == '__main__':
             ps_data[container_id]['status_since'] = status_since
             ps_data[container_id]['labels'] = labels
 
-    #print("ps_data=%s" % ps_data)
-
     if stats_parsed:
-        # print csv header
-        #print('timestamp,container_id,cpu_perc,mem_usage_bytes,mem_limit_bytes,mem_perc,netio_sent_bytes,netio_recv_bytes,blockio_read_bytes,blockio_write_bytes,pid_count')
-        
         for line in stats_parsed:
             container_id = line[0]
             cpu_perc = line[1]
