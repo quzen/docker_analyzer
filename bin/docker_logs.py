@@ -17,13 +17,11 @@ if __name__ == '__main__':
         since = '60s'
 
     ps_output = call_subprocess('docker ps -a --format "{{.ID}}"')
-    ps_output = str(ps_output, "utf-8")
 
     ps_parsed = re.findall(r"(?P<container_id>\S+)", ps_output)
 
     for container_id in ps_parsed:
         logs_output = call_subprocess('docker logs --since '+since+' '+container_id)
-        logs_output = str(logs_output, "utf-8")
         
         ts = "{:.9f}".format(time.time())
         command = ''

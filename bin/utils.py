@@ -1,9 +1,16 @@
 import subprocess
+import sys
 
 # call subprocess function
 def call_subprocess(command):
+    output_str = ""
     output = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return output.communicate()[0]
+    if sys.version_info >= (3,):
+        output_str = str(output.communicate()[0], "utf-8")
+    else:
+        output_str = output.communicate()[0]
+
+    return output_str
 
 
 # translate units into value multiplier

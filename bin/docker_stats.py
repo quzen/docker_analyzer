@@ -14,10 +14,8 @@ if __name__ == '__main__':
     
     ts = int(time.time())
     stats_output = call_subprocess('docker stats --no-stream=true --format "{{.ID}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}"')
-    stats_output = str(stats_output, "utf-8")
 
     ps_output = call_subprocess('docker ps -a --format "{{.ID}}\t{{.Image}}\t{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.Labels}}"')
-    ps_output = str(ps_output, "utf-8")
 
     ps_parsed = re.findall(r"(?P<container_id>\S+)\t(?P<image>[^\t]+)\t(?P<names>[^\t]+)\t(?P<created_at>[^\t]+)\t(?P<status_short>\S+)\s+(?P<status_since>[^\t]+)\t(?P<labels>[^\n]+)", ps_output)
 
