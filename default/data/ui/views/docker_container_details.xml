@@ -89,7 +89,7 @@
       <label>Host:</label>
       <search>
         <query>
-        | tstats count where index=docker sourcetype=docker:stats by host
+        | tstats count where sourcetype=docker:stats by host
         </query>
         <earliest>$time_tok.earliest$</earliest>
         <latest>$time_tok.latest$</latest>
@@ -104,7 +104,7 @@
       <label>Container:</label>
       <search>
         <query>
-        | tstats latest(host) as host, latest(names) as names, latest(labels) as labels where index=docker sourcetype=docker:stats $host$ by container_id
+        | tstats latest(host) as host, latest(names) as names, latest(labels) as labels where sourcetype=docker:stats $host$ by container_id
         | eval desc=if(labels=="NoLabel", names+" - "+host+" ("+container_id+")", names+" - "+host+" - "+labels+" ("+container_id+")")
         | sort desc
         </query>
@@ -120,7 +120,7 @@
   <!-- Base searches -->
   <search id="base_cpu_usage">
     <query>
-    | tstats max(cpu_perc) as max_cpu_perc, avg(cpu_perc) as avg_cpu_perc, median(cpu_perc) as median_cpu_perc where index=docker sourcetype=docker:stats $container_id$
+    | tstats max(cpu_perc) as max_cpu_perc, avg(cpu_perc) as avg_cpu_perc, median(cpu_perc) as median_cpu_perc where sourcetype=docker:stats $container_id$
     | eval max_cpu_perc=round(max_cpu_perc, 0), avg_cpu_perc=round(avg_cpu_perc, 0), median_cpu_perc=round(median_cpu_perc, 0)
     </query>
     <earliest>$time_tok.earliest$</earliest>
@@ -131,7 +131,7 @@
   
   <search id="base_inventory">
     <query>
-    index=docker sourcetype="docker:inventory" Id=$form.container_id$*
+    sourcetype="docker:inventory" Id=$form.container_id$*
     | head 1
     | eval container_info='Config.Image'+", "+'Created'
     | eval swap_info='HostConfig.MemorySwap'
@@ -204,7 +204,7 @@
       <viz type="docker_analyzer.radial_meter">
         <search>
           <query>
-          | tstats max(mem_usage_bytes) as mem_usage_bytes, max(mem_limit_bytes) as mem_limit_bytes where index=docker sourcetype=docker:stats $container_id$
+          | tstats max(mem_usage_bytes) as mem_usage_bytes, max(mem_limit_bytes) as mem_limit_bytes where sourcetype=docker:stats $container_id$
           | eval mem_usage=round(mem_usage_bytes/1024/1024, 0), mem_limit=round(mem_limit_bytes/1024/1024, 0)
           | eval mem_perc=round(100*mem_usage/mem_limit, 0)
           | table mem_perc
@@ -364,7 +364,7 @@
       <single>
         <search>
           <query>
-          | tstats latest(status_short) as status_short, latest(status_since) as status_since where index=docker sourcetype=docker:stats $container_id$
+          | tstats latest(status_short) as status_short, latest(status_since) as status_since where sourcetype=docker:stats $container_id$
           | eval status_info=status_short+", "+status_since
           | table status_info
           </query>
@@ -395,7 +395,7 @@
       <event>
         <search>
           <query>
-          index=docker sourcetype=docker:events $form.container_id$* $search_events_tok$
+          sourcetype=docker:events $form.container_id$* $search_events_tok$
           </query>
           <earliest>$time_tok.earliest$</earliest>
           <latest>$time_tok.latest$</latest>
@@ -416,7 +416,7 @@
       <event>
         <search>
           <query>
-          index=docker sourcetype=docker:logs $container_id$ $search_logs_tok$
+          sourcetype=docker:logs $container_id$ $search_logs_tok$
           </query>
           <earliest>$time_tok.earliest$</earliest>
           <latest>$time_tok.latest$</latest>
@@ -433,7 +433,7 @@
       <chart>
         <search>
           <query>
-          | tstats max(cpu_perc) as max_cpu_perc, avg(cpu_perc) as avg_cpu_perc, median(cpu_perc) as median_cpu_perc where index=docker sourcetype=docker:stats $container_id$ by _time $timespan_tok$
+          | tstats max(cpu_perc) as max_cpu_perc, avg(cpu_perc) as avg_cpu_perc, median(cpu_perc) as median_cpu_perc where sourcetype=docker:stats $container_id$ by _time $timespan_tok$
           | timechart $timespan_tok$ max(max_cpu_perc) as max_cpu_perc, avg(avg_cpu_perc) as avg_cpu_perc
           | rename max_cpu_perc as "Max CPU usage", avg_cpu_perc as "Avg CPU usage"
           </query>
@@ -467,7 +467,7 @@
       <chart>
         <search>
           <query>
-          index=docker sourcetype=docker:stats $container_id$
+          sourcetype=docker:stats $container_id$
           | streamstats window=1 current=f global=f last(netio_sent_bytes) as netio_sent_bytes_prev last(netio_recv_bytes) as netio_recv_bytes_prev
           | eval netio_sent_bytes    = max(0, netio_sent_bytes_prev - netio_sent_bytes) * -1
           | eval netio_recv_bytes    = max(0, netio_recv_bytes_prev - netio_recv_bytes)
@@ -519,7 +519,7 @@
       <chart>
         <search>
           <query>
-          | tstats avg(mem_usage_bytes) as mem_usage_bytes, avg(mem_limit_bytes) as mem_limit_bytes where index=docker sourcetype=docker:stats $container_id$ by _time $timespan_tok$
+          | tstats avg(mem_usage_bytes) as mem_usage_bytes, avg(mem_limit_bytes) as mem_limit_bytes where sourcetype=docker:stats $container_id$ by _time $timespan_tok$
           | eval mem_usage=round(mem_usage_bytes/1024/1024, 0), mem_limit=round(mem_limit_bytes/1024/1024, 0)
           | eval mem_free=mem_limit-mem_usage
           | timechart $timespan_tok$ avg(mem_free) as mem_free, avg(mem_limit) as mem_limit, avg(mem_usage) as mem_usage
@@ -567,7 +567,7 @@
       <chart>
         <search>
           <query>
-          | tstats avg(pid_count) as pid_count, latest(status_short) as status_short where index=docker sourcetype=docker:stats $container_id$ by _time $timespan_tok$
+          | tstats avg(pid_count) as pid_count, latest(status_short) as status_short where sourcetype=docker:stats $container_id$ by _time $timespan_tok$
           | eval status=if(status_short=="Up", 100, 0)
           | timechart $timespan_tok$ avg(pid_count) as pid_count, avg(status) as status
           | rename pid_count as "PID count", status as "Status"
@@ -614,7 +614,7 @@
           <refresh>$autorefresh_tok$</refresh>
           <refreshType>delay</refreshType>
           <query>
-            | tstats avg(cpu_perc) as cpu_perc, avg(mem_res_bytes) as mem_usage_bytes, perc50(cpu_perc) as avg_cpu_perc, max(cpu_perc) as max_cpu_perc, perc50(mem_res_bytes) as avg_mem_usage_bytes, max(mem_res_bytes) as max_mem_usage_bytes where index=docker sourcetype=docker:top $container_id$ by command, _time $timespan_tok$
+            | tstats avg(cpu_perc) as cpu_perc, avg(mem_res_bytes) as mem_usage_bytes, perc50(cpu_perc) as avg_cpu_perc, max(cpu_perc) as max_cpu_perc, perc50(mem_res_bytes) as avg_mem_usage_bytes, max(mem_res_bytes) as max_mem_usage_bytes where sourcetype=docker:top $container_id$ by command, _time $timespan_tok$
             | eval labels=if(len(labels) &gt; 32, "Unknown", labels)
             | eval mem_usage=round(mem_usage_bytes/1024/1024, 0), avg_mem_usage=round(avg_mem_usage_bytes/1024/1024, 0), max_mem_usage=round(max_mem_usage_bytes/1024/1024, 0)
             | chart sparkline(avg(cpu_perc)) as cpu_perc, sparkline(avg(mem_usage)) as mem_usage, avg(avg_cpu_perc) as avg_cpu_perc, max(max_cpu_perc) as max_cpu_perc, avg(avg_mem_usage) as avg_mem_usage, max(max_mem_usage) as max_mem_usage by command

@@ -3,5 +3,7 @@
 []
 access = read : [ * ], write : [ admin, power ]
 
+# Visualizations
 
-
+[visualizations/radial_meter]
+export = none

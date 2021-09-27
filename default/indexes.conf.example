@@ -1,4 +1,5 @@
-## Docker Index
+# Docker Index
+# Create docker index like below
 [docker]
 homePath   = $SPLUNK_DB/docker/db
 coldPath   = $SPLUNK_DB/docker/colddb
