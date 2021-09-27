@@ -1,6 +1,7 @@
 # Contents
-This app contains scripted inputs for Docker stats, top, logs, events collection.
-And few dashboards enabling deep analysis of Docker data in a simple yet powerful way.
+This Splunk app contains scripted inputs for Docker stats, top, logs, events collection.
+It enables complete Docker monitoring using all in one solution: data collection, storage and visualization.
+Few Splunk dashboards allow deep analysis of Docker data in a simple yet powerful way.
 
 # Requirements
 In order to collect Docker data, scripted inputs make use of docker cli.
