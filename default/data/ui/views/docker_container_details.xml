@@ -1,6 +1,6 @@
 <form script="multiselect_functions.js">
   <label>Docker Container</label>
-  <description>System performance metrics, configuration inventory</description>
+  <description>Container performance metrics, configuration inventory, logs, events</description>
   <init>
     <!-- set or unset Debug token which activates Debug Panel -->
     <unset token="debug_tok">debug</unset>
@@ -12,7 +12,7 @@
         <style>
           /* Panel Title Style */
           .dashboard-row .dashboard-panel h2.panel-title {
-            color: #62b9fe;
+            color: #0180e7;
             font-size: 20px;
             font-weight: 500;
             background-color: #c7d2de;
@@ -42,7 +42,7 @@
             padding: 0.4em 1em;
             border: 0.1em solid #048cc7;
             border-radius: 0.38em;
-            background-image: linear-gradient(#62b9fe, #62b9fe);
+            background-image: linear-gradient(#0180e7, #0180e7);
           }
         </style>
        </html>
