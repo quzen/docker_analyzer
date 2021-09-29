@@ -13,7 +13,13 @@ This app has to be installed on:
 * indexers (field extractions and docker index creation)
 * search heads (dashboards)
 
-Scripted inputs configured to send data to docker index.
+Scripted inputs configured to send data to a default index.
+No HTTP Event Collector needed. Uses default forwarder to indexer tcp stream.
+
+Create a new index for docker data, example config is in indexes.conf.example.
+Configure inputs to send data to the created docker index (index=docker is commented out in inputs.conf)
+
+docker_stats.py script supports --label argument to specify the exact label name to be extracted (ex. --label=maintainer)
 
 # Links
 Github repository: https://github.com/quzen/docker_analyzer
